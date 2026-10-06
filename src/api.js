@@ -12,8 +12,8 @@ function migrateDemo(old){
 try{demo=migrateDemo(JSON.parse(localStorage.getItem(STORE))||JSON.parse(localStorage.getItem('galdcup-demo-v1')));}catch{demo=migrateDemo();}
 let activeProject=sessionStorage.getItem('galdcup-project:'+url)||null;
 export const getProjectId=()=>activeProject;
-export function selectProject(id){activeProject=id;sessionStorage.setItem('galdcup-project:'+url,id);}
-export async function listProjects(){return live?allRows('projects',''):structuredClone(demo.projects);}
+export function selectProject(id){activeProject=id||null;if(id)sessionStorage.setItem('galdcup-project:'+url,id);else sessionStorage.removeItem('galdcup-project:'+url);}
+export async function listProjects(){return live?allRows('projects','&deleted_at=is.null'):structuredClone(demo.projects);}
 export async function createProject(name){
  await requireEditor();name=name.trim();if(!name||name.length>80)throw Error('프로젝트 이름은 1~80자로 입력해 주세요.');
  const now=new Date().toISOString(),project={id:crypto.randomUUID(),name,created_at:now,updated_at:now,saved_at:now};
@@ -46,22 +46,28 @@ export const imageUrl=i=>i.image_path?(live?`${url}/storage/v1/object/public/tie
 async function allRows(table,query){let rows=[];for(let offset=0;;offset+=1000){const data=await request(`/rest/v1/${table}?select=*&order=id&limit=1000&offset=${offset}${query}`);rows.push(...data);if(data.length<1000)break;}return rows;}
 export async function snapshot(){
  const projects=await listProjects();let id=activeProject;
- if(!projects.some(p=>p.id===id)){id=projects[0]?.id||null;if(id)selectProject(id);}
+ if(!projects.some(p=>p.id===id)){id=projects[0]?.id||null;selectProject(id);}
  if(!id)return {projects,projectId:null,items:[],comments:[]};
  if(!live)return structuredClone({projects,projectId:id,items:demo.items.filter(i=>i.project_id===id),comments:demo.comments.filter(c=>c.project_id===id)});
  const [items,comments]=await Promise.all([allRows('items',`&deleted_at=is.null&project_id=eq.${id}`),allRows('comments',`&project_id=eq.${id}`)]);
  return {projects,projectId:id,items,comments};
 }
-export async function isEditor(){if(!live)return sessionStorage.getItem('galdcup-demo-editor')==='yes';return session?Boolean(await rpc('is_editor')):false;}
-export async function login(password){
- if(!live){if(password!=='demo')throw Error('체험 비밀번호는 demo입니다.');sessionStorage.setItem('galdcup-demo-editor','yes');return;}
- if(anonymousPromise)await anonymousPromise.catch(()=>{});if(refreshPromise)await refreshPromise.catch(()=>{});
- if(!cfg.EDITOR_EMAIL)throw Error('관리자 이메일 설정이 필요합니다.');
- let result;try{result=await request('/auth/v1/token?grant_type=password',{method:'POST',body:{email:cfg.EDITOR_EMAIL,password},auth:false});}catch{throw Error('로그인하지 못했습니다. 비밀번호와 연결을 확인해 주세요.');}
- saveSession(result);if(!await isEditor()){await logout();throw Error('편집 권한이 없는 계정입니다.');}
+export async function isEditor(){return sessionStorage.getItem('galdcup-edit-mode')==='yes';}
+// Editing is a UI mode, not a password-protected role. Anonymous Auth is automatic.
+export async function login(){sessionStorage.setItem('galdcup-edit-mode','yes');}
+export async function logout(){sessionStorage.removeItem('galdcup-edit-mode');}
+async function requireEditor(){if(!await isEditor())throw Error('수정하기 버튼을 눌러 편집 모드를 켜 주세요.');if(live)await ensureAnonymous();}
+export async function renameProject(id,name){
+ await requireEditor();name=name.trim();if(!name||name.length>80)throw Error('프로젝트 이름은 1~80자로 입력해 주세요.');
+ if(live){await rpc('rename_project',{p_id:id,p_name:name});return;}
+ if(!demo.projects.some(p=>p.id===id))throw Error('이미 삭제된 프로젝트입니다.');
+ persist({...demo,projects:demo.projects.map(p=>p.id===id?{...p,name,updated_at:new Date().toISOString()}:p)});
 }
-export async function logout(){if(live){try{if(session)await request('/auth/v1/logout?scope=local',{method:'POST'});}finally{saveSession(null);}}else sessionStorage.removeItem('galdcup-demo-editor');}
-async function requireEditor(){if(!await isEditor())throw Error('수정 버튼을 눌러 편집 권한을 확인해 주세요.');}
+export async function deleteProject(id){
+ await requireEditor();
+ if(live){await rpc('delete_project',{p_id:id});return;}
+ persist({...demo,projects:demo.projects.filter(p=>p.id!==id),items:demo.items.filter(i=>i.project_id!==id),comments:demo.comments.filter(c=>c.project_id!==id)});
+}
 export async function moveItem(id,tier,beforeId=null){
  await requireEditor();if(live){await rpc('move_item',{p_id:id,p_tier:tier,p_before:beforeId});return;}
  const next=structuredClone(demo),item=next.items.find(i=>i.id===id&&i.project_id===activeProject);if(!item)throw Error('이미 삭제된 항목입니다.');

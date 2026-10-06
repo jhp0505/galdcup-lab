@@ -23,3 +23,6 @@ button:disabled{opacity:1;color:#a5afc0;background-color:#282d36;border-color:#4
 @media(max-width:600px){.project-bar{padding:16px;gap:15px}.project-actions{display:grid;grid-template-columns:1fr 1fr}.project-actions .button{font-size:12px}.project-identity select{font-size:16px}.project-grid{grid-template-columns:1fr}}
 
 .button.primary:disabled,.button.subtle:disabled,button:disabled{color:#c1cbda;-webkit-text-fill-color:#c1cbda}.detail-image.only-text:disabled,.detail-image.only-text:disabled .glyph{color:#f2f5fa;-webkit-text-fill-color:#f2f5fa}
+
+/* Project list controls */
+.project-card{padding:0;overflow:hidden;gap:0}.project-open{display:flex;flex-direction:column;align-items:flex-start;gap:12px;text-align:left;width:100%;padding:22px;color:#f1f5fa;background:#292f39}.project-open strong{font-size:17px;overflow-wrap:anywhere}.project-open small{color:#c1ccdc;font-size:12px}.project-open>span:last-child{color:#c2f87b;font-size:13px}.project-card-actions{display:flex;gap:8px;border-top:1px solid #495363;padding:12px;width:100%;flex-wrap:wrap}.project-card-actions .button{font-size:13px;flex:1;white-space:nowrap}.project-card-actions .project-delete{color:#ffc2c8;-webkit-text-fill-color:#ffc2c8;background:#422d36;border-color:#825360}
